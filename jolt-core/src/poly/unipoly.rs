@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 use crate::utils::gaussian_elimination::gaussian_elimination;
 use crate::utils::transcript::{AppendToTranscript, ProofTranscript};
-use ark_ff::PrimeField;
-use ark_serialize::*;
+use ff::PrimeField;
+use serde::{Deserialize, Serialize};
 
 // ax^2 + bx + c stored as vec![c,b,a]
 // ax^3 + bx^2 + cx + d stored as vec![d,c,b,a]
@@ -13,7 +13,7 @@ pub struct UniPoly<F> {
 
 // ax^2 + bx + c stored as vec![c,a]
 // ax^3 + bx^2 + cx + d stored as vec![d,b,a]
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CompressedUniPoly<F: PrimeField> {
     coeffs_except_linear_term: Vec<F>,
 }
@@ -32,13 +32,13 @@ impl<F: PrimeField> UniPoly<F> {
 
     fn vandermonde_interpolation(evals: &[F]) -> Vec<F> {
         let n = evals.len();
-        let xs: Vec<F> = (0..n).map(|x| F::from_u64(x as u64).unwrap()).collect();
+        let xs: Vec<F> = (0..n).map(|x| F::from(x as u64)).collect();
 
         let mut vandermonde: Vec<Vec<F>> = Vec::with_capacity(n);
         for i in 0..n {
             let mut row = Vec::with_capacity(n);
             let x = xs[i];
-            row.push(F::one());
+            row.push(F::ONE);
             row.push(x);
             for j in 2..n {
                 row.push(row[j - 1] * x);
@@ -116,16 +116,21 @@ impl<F: PrimeField> AppendToTranscript for UniPoly<F> {
 mod tests {
 
     use super::*;
-    use ark_bn254::Fr;
+    use ff::PrimeField;
+    use goldilocks::Goldilocks;
+    use goldilocks::GoldilocksExt2;
+    use halo2curves::bn256::Fr;
 
     #[test]
     fn test_from_evals_quad() {
-        test_from_evals_quad_helper::<Fr>()
+        test_from_evals_quad_helper::<Fr>();
+        test_from_evals_quad_helper::<Goldilocks>();
+        test_from_evals_quad_helper::<GoldilocksExt2>();
     }
 
     fn test_from_evals_quad_helper<F: PrimeField>() {
         // polynomial is 2x^2 + 3x + 1
-        let e0 = F::one();
+        let e0 = F::ONE;
         let e1 = F::from(6u64);
         let e2 = F::from(15u64);
         let evals = vec![e0, e1, e2];
@@ -134,7 +139,7 @@ mod tests {
         assert_eq!(poly.eval_at_zero(), e0);
         assert_eq!(poly.eval_at_one(), e1);
         assert_eq!(poly.coeffs.len(), 3);
-        assert_eq!(poly.coeffs[0], F::one());
+        assert_eq!(poly.coeffs[0], F::ONE);
         assert_eq!(poly.coeffs[1], F::from(3u64));
         assert_eq!(poly.coeffs[2], F::from(2u64));
 
@@ -151,11 +156,13 @@ mod tests {
 
     #[test]
     fn test_from_evals_cubic() {
-        test_from_evals_cubic_helper::<Fr>()
+        test_from_evals_cubic_helper::<Fr>();
+        test_from_evals_cubic_helper::<Goldilocks>();
+        test_from_evals_cubic_helper::<GoldilocksExt2>();
     }
     fn test_from_evals_cubic_helper<F: PrimeField>() {
         // polynomial is x^3 + 2x^2 + 3x + 1
-        let e0 = F::one();
+        let e0 = F::ONE;
         let e1 = F::from(7u64);
         let e2 = F::from(23u64);
         let e3 = F::from(55u64);
@@ -165,10 +172,10 @@ mod tests {
         assert_eq!(poly.eval_at_zero(), e0);
         assert_eq!(poly.eval_at_one(), e1);
         assert_eq!(poly.coeffs.len(), 4);
-        assert_eq!(poly.coeffs[0], F::one());
+        assert_eq!(poly.coeffs[0], F::ONE);
         assert_eq!(poly.coeffs[1], F::from(3u64));
         assert_eq!(poly.coeffs[2], F::from(2u64));
-        assert_eq!(poly.coeffs[3], F::one());
+        assert_eq!(poly.coeffs[3], F::ONE);
 
         let hint = e0 + e1;
         let compressed_poly = poly.compress();

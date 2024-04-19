@@ -11,7 +11,10 @@ authors = [
     "Sam Ragsdale <sragsdale@a16z.com>",
     "Noah Citron <ncitron@a16z.com>",
     "Arasu Arun <arasu.arun5@gmail.com>",
+    # authors who contributed to Jolty2
+    "Zhenfei Zhang <zhenfei.zhang@hotmail.com>",
 ]
+
 edition = "2021"
 description = "The lookup singularity. Based on Spartan; built on Arkworks."
 documentation = "https://github.com/a16z/jolt/README.md"
@@ -20,18 +23,15 @@ license-file = "LICENSE"
 keywords = ["SNARK", "cryptography", "proofs"]
 
 [dependencies]
-ark-bn254 = "0.4.0"
-ark-ec = { version = "0.4.2", default-features = false }
-ark-ff = { version = "0.4.2", default-features = false }
-ark-serialize = { version = "0.4.2", default-features = false, features = [
-    "derive",
-] }
-ark-std = { version = "0.4.0", default-features = false }
+ark-std = "0.4.0"
 clap = { version = "4.3.10", features = ["derive"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 digest = "0.8.1"
 enum_dispatch = "0.3.12"
+ff = "0.13.0"
 fixedbitset = "0.5.0"
+goldilocks = { git = "https://github.com/zhenfeizhang/Goldilocks" }
+halo2curves = "0.1.0"
 itertools = "0.10.0"
 lazy_static = "1.4.0"
 merlin = "3.0.0"
@@ -44,7 +44,7 @@ rand_chacha = { version = "0.3.0", default-features = false }
 rand_core = { version = "0.5", default-features = false }
 rayon = { version = "^1.8.0", optional = true }
 rgb = "0.8.37"
-serde = { version = "1.0.*", default-features = false }
+serde = { version = "1.0.*", default-features = false, features = ["derive"] }
 sha3 = "0.8.2"
 smallvec = "1.13.1"
 strum = "0.25.0"
@@ -75,10 +75,6 @@ path = "src/lib.rs"
 
 [features]
 default = [
-    "ark-ec/parallel",
-    "ark-ff/parallel",
-    "ark-std/parallel",
-    "ark-ff/asm",
     "multicore",
 ]
 multicore = ["rayon"]

@@ -12,7 +12,7 @@ use crate::subprotocols::grand_product::{
 use crate::utils::errors::ProofVerifyError;
 use crate::utils::transcript::ProofTranscript;
 
-use ark_ec::CurveGroup;
+// use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use itertools::interleave;

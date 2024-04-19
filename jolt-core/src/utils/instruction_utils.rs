@@ -1,4 +1,4 @@
-use ark_ff::PrimeField;
+use ff::PrimeField;
 
 pub fn assert_valid_parameters(word_size: usize, C: usize, log_M: usize) {
     assert!(C * log_M >= word_size);
@@ -11,9 +11,9 @@ pub fn assert_valid_parameters(word_size: usize, C: usize, log_M: usize) {
 pub fn concatenate_lookups<F: PrimeField>(vals: &[F], C: usize, operand_bits: usize) -> F {
     assert_eq!(vals.len(), C);
 
-    let mut sum = F::zero();
-    let mut weight = F::one();
-    let shift = F::from_u64(1u64 << operand_bits).unwrap();
+    let mut sum = F::ZERO;
+    let mut weight = F::ONE;
+    let shift = F::from(1u64 << operand_bits);
     for i in 0..C {
         sum += weight * vals[C - i - 1];
         weight *= shift;
@@ -109,17 +109,26 @@ pub fn chunk_and_concatenate_for_shift(x: u64, y: u64, C: usize, log_M: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_bn254::Fr;
+    use ff::PrimeField;
+    use goldilocks::Goldilocks;
+    use goldilocks::GoldilocksExt2;
+    use halo2curves::bn256::Fr;
 
     #[test]
     fn concatenate_lookups_test() {
-        let vals = vec![Fr::from(1), Fr::from(2), Fr::from(3)];
-        let concat = concatenate_lookups(&vals, 3, 2);
-        assert_eq!(concat, Fr::from(0b01_10_11));
+        concatenate_lookups_test_helper::<Fr>();
+        concatenate_lookups_test_helper::<Goldilocks>();
+        concatenate_lookups_test_helper::<GoldilocksExt2>();
+    }
 
-        let vals = vec![Fr::from(7), Fr::from(1), Fr::from(2), Fr::from(3)];
+    fn concatenate_lookups_test_helper<F: PrimeField>() {
+        let vals = vec![F::from(1), F::from(2), F::from(3)];
+        let concat = concatenate_lookups(&vals, 3, 2);
+        assert_eq!(concat, F::from(0b01_10_11));
+
+        let vals = vec![F::from(7), F::from(1), F::from(2), F::from(3)];
         let concat = concatenate_lookups(&vals, 4, 3);
-        assert_eq!(concat, Fr::from(0b111_001_010_011));
+        assert_eq!(concat, F::from(0b111_001_010_011));
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
+use ff::{FromUniformBytes, PrimeField};
+use halo2curves::group::GroupEncoding;
 use merlin::Transcript;
 
 pub struct ProofTranscript {
@@ -30,9 +30,8 @@ impl ProofTranscript {
     }
 
     pub fn append_scalar<F: PrimeField>(&mut self, label: &'static [u8], scalar: &F) {
-        let mut buf = vec![];
-        scalar.serialize_compressed(&mut buf).unwrap();
-        self.inner.append_message(label, &buf);
+        let buf = scalar.to_repr();
+        self.inner.append_message(label, buf.as_ref());
     }
 
     pub fn append_scalars<F: PrimeField>(&mut self, label: &'static [u8], scalars: &[F]) {
@@ -43,13 +42,12 @@ impl ProofTranscript {
         self.inner.append_message(label, b"end_append_vector");
     }
 
-    pub fn append_point<G: CurveGroup>(&mut self, label: &'static [u8], point: &G) {
-        let mut buf = vec![];
-        point.serialize_compressed(&mut buf).unwrap();
-        self.inner.append_message(label, &buf);
+    pub fn append_point<G: GroupEncoding>(&mut self, label: &'static [u8], point: &G) {
+        let buf = point.to_bytes();
+        self.inner.append_message(label, buf.as_ref());
     }
 
-    pub fn append_points<G: CurveGroup>(&mut self, label: &'static [u8], points: &[G]) {
+    pub fn append_points<G: GroupEncoding>(&mut self, label: &'static [u8], points: &[G]) {
         self.append_message(label, b"begin_append_vector");
         for item in points.iter() {
             self.append_point(label, item);
@@ -57,13 +55,17 @@ impl ProofTranscript {
         self.inner.append_message(label, b"end_append_vector");
     }
 
-    pub fn challenge_scalar<F: PrimeField>(&mut self, label: &'static [u8]) -> F {
+    pub fn challenge_scalar<F: FromUniformBytes<64>>(&mut self, label: &'static [u8]) -> F {
         let mut buf = [0u8; 64];
         self.inner.challenge_bytes(label, &mut buf);
-        F::from_le_bytes_mod_order(&buf)
+        F::from_uniform_bytes(&buf)
     }
 
-    pub fn challenge_vector<F: PrimeField>(&mut self, label: &'static [u8], len: usize) -> Vec<F> {
+    pub fn challenge_vector<F: FromUniformBytes<64>>(
+        &mut self,
+        label: &'static [u8],
+        len: usize,
+    ) -> Vec<F> {
         (0..len)
             .map(|_i| self.challenge_scalar(label))
             .collect::<Vec<F>>()

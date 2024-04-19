@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use ark_ff::PrimeField;
+use ff::PrimeField;
 
 use ark_std::test_rng;
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
 
-use crate::poly::dense_mlpoly::DensePolynomial;
+// use crate::poly::dense_mlpoly::DensePolynomial;
 
 pub mod errors;
 pub mod gaussian_elimination;
@@ -38,9 +38,9 @@ pub fn index_to_field_bitvector<F: PrimeField>(value: usize, bits: usize) -> Vec
 
     for i in (0..bits).rev() {
         if (value >> i) & 1 == 1 {
-            bitvector.push(F::one());
+            bitvector.push(F::ONE);
         } else {
-            bitvector.push(F::zero());
+            bitvector.push(F::ZERO);
         }
     }
     bitvector
@@ -50,9 +50,9 @@ pub fn index_to_field_bitvector<F: PrimeField>(value: usize, bits: usize) -> Vec
 pub fn ff_bitvector_dbg<F: PrimeField>(f: &Vec<F>) -> String {
     let mut result = "".to_owned();
     for bit in f {
-        if *bit == F::one() {
+        if *bit == F::ONE {
             result.push('1');
-        } else if *bit == F::zero() {
+        } else if *bit == F::ZERO {
             result.push('0');
         } else {
             result.push('?');
@@ -80,11 +80,11 @@ pub fn compute_dotproduct_low_optimized<F: PrimeField>(a: &[F], b: &[F]) -> F {
 
 #[inline(always)]
 pub fn mul_0_1_optimized<F: PrimeField>(a: &F, b: &F) -> F {
-    if a.is_zero() || b.is_zero() {
-        F::zero()
-    } else if a.is_one() {
+    if a.is_zero_vartime() || b.is_zero_vartime() {
+        F::ZERO
+    } else if *a == F::ONE {
         *b
-    } else if b.is_one() {
+    } else if *b == F::ONE {
         *a
     } else {
         *a * b
@@ -93,8 +93,8 @@ pub fn mul_0_1_optimized<F: PrimeField>(a: &F, b: &F) -> F {
 
 #[inline(always)]
 pub fn mul_0_optimized<F: PrimeField>(likely_zero: &F, x: &F) -> F {
-    if likely_zero.is_zero() {
-        F::zero()
+    if likely_zero.is_zero_vartime() {
+        F::ZERO
     } else {
         *likely_zero * x
     }
@@ -120,50 +120,50 @@ pub fn gen_random_point<F: PrimeField>(memory_bits: usize) -> Vec<F> {
     let mut rng = test_rng();
     let mut r_i: Vec<F> = Vec::with_capacity(memory_bits);
     for _ in 0..memory_bits {
-        r_i.push(F::rand(&mut rng));
+        r_i.push(F::random(&mut rng));
     }
     r_i
 }
 
-#[inline]
-#[tracing::instrument(skip_all, name = "split_poly_flagged")]
-pub fn split_poly_flagged<F: PrimeField>(
-    poly: &DensePolynomial<F>,
-    flags: &DensePolynomial<F>,
-) -> (Vec<F>, Vec<F>) {
-    let poly_evals: &[F] = poly.evals_ref();
-    let len = poly_evals.len();
-    let half = len / 2;
-    let mut left: Vec<F> = Vec::with_capacity(half);
-    let mut right: Vec<F> = Vec::with_capacity(half);
+// #[inline]
+// #[tracing::instrument(skip_all, name = "split_poly_flagged")]
+// pub fn split_poly_flagged<F: PrimeField>(
+//     poly: &DensePolynomial<F>,
+//     flags: &DensePolynomial<F>,
+// ) -> (Vec<F>, Vec<F>) {
+//     let poly_evals: &[F] = poly.evals_ref();
+//     let len = poly_evals.len();
+//     let half = len / 2;
+//     let mut left: Vec<F> = Vec::with_capacity(half);
+//     let mut right: Vec<F> = Vec::with_capacity(half);
 
-    for i in 0..len {
-        if flags[i].is_zero() {
-            if i < half {
-                left.push(F::one());
-            } else {
-                right.push(F::one());
-            }
-        } else {
-            if i < half {
-                left.push(poly_evals[i]);
-            } else {
-                right.push(poly_evals[i]);
-            }
-        }
-    }
-    (left, right)
-}
+//     for i in 0..len {
+//         if flags[i].is_zero() {
+//             if i < half {
+//                 left.push(F::one());
+//             } else {
+//                 right.push(F::one());
+//             }
+//         } else {
+//             if i < half {
+//                 left.push(poly_evals[i]);
+//             } else {
+//                 right.push(poly_evals[i]);
+//             }
+//         }
+//     }
+//     (left, right)
+// }
 
-pub fn count_poly_zeros<F: PrimeField>(poly: &DensePolynomial<F>) -> usize {
-    let mut count = 0;
-    for i in 0..poly.len() {
-        if poly[i].is_zero() {
-            count += 1;
-        }
-    }
-    count
-}
+// pub fn count_poly_zeros<F: PrimeField>(poly: &DensePolynomial<F>) -> usize {
+//     let mut count = 0;
+//     for i in 0..poly.len() {
+//         if poly[i].is_zero() {
+//             count += 1;
+//         }
+//     }
+//     count
+// }
 
 #[cfg(test)]
 mod tests {

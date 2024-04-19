@@ -4,8 +4,8 @@ use crate::utils::thread::unsafe_allocate_zero_vec;
 use crate::utils::{self, compute_dotproduct, compute_dotproduct_low_optimized};
 
 use crate::utils::math::Math;
-use ark_ff::PrimeField;
 use core::ops::Index;
+use ff::PrimeField;
 use rayon::prelude::*;
 use std::ops::AddAssign;
 
@@ -35,7 +35,7 @@ impl<F: PrimeField> DensePolynomial<F> {
         // Pad non-power-2 evaluations to fill out the dense multilinear polynomial
         let mut poly_evals = evals;
         while !(utils::is_power_of_two(poly_evals.len())) {
-            poly_evals.push(F::zero());
+            poly_evals.push(F::ZERO);
         }
 
         DensePolynomial {
@@ -104,7 +104,7 @@ impl<F: PrimeField> DensePolynomial<F> {
             .filter(|(&mut a, &b)| a != b)
             .for_each(|(a, b)| {
                 let m = *b - *a;
-                if m.is_one() {
+                if m == F::ONE {
                     *a += *r;
                 } else {
                     *a += *r * m;
@@ -130,7 +130,7 @@ impl<F: PrimeField> DensePolynomial<F> {
                 *a += *r * (*b - *a);
             });
 
-        self.Z.resize(n, F::zero());
+        self.Z.resize(n, F::ZERO);
         self.num_vars -= 1;
         self.len = n;
     }
@@ -144,7 +144,7 @@ impl<F: PrimeField> DensePolynomial<F> {
             // let low' = low + r * (high - low)
             let low = self.Z[i];
             let high = self.Z[i + n];
-            if !(low.is_zero() && high.is_zero()) {
+            if !(low.is_zero_vartime() && high.is_zero_vartime()) {
                 let m = high - low;
                 new_evals[i] = low + *r * m;
             }
@@ -173,17 +173,17 @@ impl<F: PrimeField> DensePolynomial<F> {
             let low = self.Z[i];
             let high = self.Z[i + n];
 
-            if low.is_zero() {
-                if high.is_one() {
+            if low.is_zero_vartime() {
+                if high == F::ONE {
                     new_evals[i] = *r;
-                } else if !high.is_zero() {
+                } else if !high.is_zero_vartime() {
                     panic!("Shouldn't happen for a flag poly");
                 }
-            } else if low.is_one() {
-                if high.is_one() {
-                    new_evals[i] = F::one();
-                } else if high.is_zero() {
-                    new_evals[i] = F::one() - r;
+            } else if low == F::ONE {
+                if high == F::ONE {
+                    new_evals[i] = F::ONE;
+                } else if high.is_zero_vartime() {
+                    new_evals[i] = F::ONE - r;
                 } else {
                     panic!("Shouldn't happen for a flag poly");
                 }
@@ -259,18 +259,14 @@ impl<F: PrimeField> DensePolynomial<F> {
     pub fn from_usize(Z: &[usize]) -> Self {
         DensePolynomial::new(
             (0..Z.len())
-                .map(|i| F::from_u64(Z[i] as u64).unwrap())
+                .map(|i| F::from(Z[i] as u64))
                 .collect::<Vec<F>>(),
         )
     }
 
     #[tracing::instrument(skip_all, name = "DensePolynomial::from")]
     pub fn from_u64(Z: &[u64]) -> Self {
-        DensePolynomial::new(
-            (0..Z.len())
-                .map(|i| F::from_u64(Z[i]).unwrap())
-                .collect::<Vec<F>>(),
-        )
+        DensePolynomial::new((0..Z.len()).map(|i| F::from(Z[i])).collect::<Vec<F>>())
     }
 }
 
@@ -308,20 +304,16 @@ mod tests {
     use crate::poly::hyrax::matrix_dimensions;
 
     use super::*;
-    use ark_bn254::Fr;
-    use ark_bn254::G1Projective;
-    use ark_ec::CurveGroup;
     use ark_std::test_rng;
-    use ark_std::One;
-    use ark_std::UniformRand;
+    use ff::PrimeField;
+    use goldilocks::Goldilocks;
+    use goldilocks::GoldilocksExt2;
+    use halo2curves::bn256::Fr;
 
-    fn evaluate_with_LR<G: CurveGroup>(
-        Z: &[G::ScalarField],
-        r: &[G::ScalarField],
-    ) -> G::ScalarField {
+    fn evaluate_with_LR<F: PrimeField>(Z: &[F], r: &[F]) -> F {
         let ell = r.len();
         let (L_size, _R_size) = matrix_dimensions(ell, 1);
-        let eq = EqPolynomial::<G::ScalarField>::new(r.to_vec());
+        let eq = EqPolynomial::<F>::new(r.to_vec());
         let (L, R) = eq.compute_factored_evals(L_size);
 
         // ensure ell is even
@@ -334,7 +326,7 @@ mod tests {
         // compute vector-matrix product between L and Z viewed as a matrix
         let LZ = (0..m)
             .map(|i| (0..m).map(|j| L[j] * Z[j * m + i]).sum())
-            .collect::<Vec<G::ScalarField>>();
+            .collect::<Vec<F>>();
 
         // compute dot product between LZ and R
         compute_dotproduct(&LZ, &R)
@@ -342,26 +334,23 @@ mod tests {
 
     #[test]
     fn check_polynomial_evaluation() {
-        check_polynomial_evaluation_helper::<G1Projective>()
+        check_polynomial_evaluation_helper::<Fr>();
+        check_polynomial_evaluation_helper::<Goldilocks>();
+        check_polynomial_evaluation_helper::<GoldilocksExt2>();
     }
 
-    fn check_polynomial_evaluation_helper<G: CurveGroup>() {
+    fn check_polynomial_evaluation_helper<F: PrimeField>() {
         // Z = [1, 2, 1, 4]
-        let Z = vec![
-            G::ScalarField::one(),
-            G::ScalarField::from(2u64),
-            G::ScalarField::one(),
-            G::ScalarField::from(4u64),
-        ];
+        let Z = vec![F::ONE, F::from(2u64), F::ONE, F::from(4u64)];
 
         // r = [4,3]
-        let r = vec![G::ScalarField::from(4u64), G::ScalarField::from(3u64)];
+        let r = vec![F::from(4u64), F::from(3u64)];
 
-        let eval_with_LR = evaluate_with_LR::<G>(&Z, &r);
+        let eval_with_LR = evaluate_with_LR::<F>(&Z, &r);
         let poly = DensePolynomial::new(Z);
 
         let eval = poly.evaluate(&r);
-        assert_eq!(eval, G::ScalarField::from(28u64));
+        assert_eq!(eval, F::from(28u64));
         assert_eq!(eval_with_LR, eval);
     }
 
@@ -376,13 +365,13 @@ mod tests {
 
         // compute row vector L
         for i in 0..m {
-            let mut chi_i = F::one();
+            let mut chi_i = F::ONE;
             for j in 0..ell / 2 {
                 let bit_j = ((m * i) & (1 << (r.len() - j - 1))) > 0;
                 if bit_j {
                     chi_i *= r[j];
                 } else {
-                    chi_i *= F::one() - r[j];
+                    chi_i *= F::ONE - r[j];
                 }
             }
             L.push(chi_i);
@@ -390,13 +379,13 @@ mod tests {
 
         // compute column vector R
         for i in 0..m {
-            let mut chi_i = F::one();
+            let mut chi_i = F::ONE;
             for j in ell / 2..ell {
                 let bit_j = (i & (1 << (r.len() - j - 1))) > 0;
                 if bit_j {
                     chi_i *= r[j];
                 } else {
-                    chi_i *= F::one() - r[j];
+                    chi_i *= F::ONE - r[j];
                 }
             }
             R.push(chi_i);
@@ -409,13 +398,13 @@ mod tests {
         let n = ell.pow2();
         let mut chis: Vec<F> = Vec::new();
         for i in 0..n {
-            let mut chi_i = F::one();
+            let mut chi_i = F::ONE;
             for j in 0..r.len() {
                 let bit_j = (i & (1 << (r.len() - j - 1))) > 0;
                 if bit_j {
                     chi_i *= r[j];
                 } else {
-                    chi_i *= F::one() - r[j];
+                    chi_i *= F::ONE - r[j];
                 }
             }
             chis.push(chi_i);
@@ -435,19 +424,21 @@ mod tests {
 
     #[test]
     fn check_memoized_chis() {
-        check_memoized_chis_helper::<G1Projective>()
+        check_memoized_chis_helper::<Fr>();
+        check_memoized_chis_helper::<Goldilocks>();
+        check_memoized_chis_helper::<GoldilocksExt2>();
     }
 
-    fn check_memoized_chis_helper<G: CurveGroup>() {
+    fn check_memoized_chis_helper<F: PrimeField>() {
         let mut prng = test_rng();
 
         let s = 10;
-        let mut r: Vec<G::ScalarField> = Vec::new();
+        let mut r: Vec<F> = Vec::new();
         for _i in 0..s {
-            r.push(G::ScalarField::rand(&mut prng));
+            r.push(F::random(&mut prng));
         }
-        let chis = compute_chis_at_r::<G::ScalarField>(&r);
-        let chis_m = EqPolynomial::<G::ScalarField>::new(r).evals();
+        let chis = compute_chis_at_r::<F>(&r);
+        let chis_m = EqPolynomial::<F>::new(r).evals();
         assert_eq!(chis, chis_m);
     }
 
@@ -462,7 +453,7 @@ mod tests {
         let s = 10;
         let mut r: Vec<F> = Vec::new();
         for _i in 0..s {
-            r.push(F::rand(&mut prng));
+            r.push(F::random(&mut prng));
         }
         let chis = EqPolynomial::new(r.clone()).evals();
         let (L_size, _R_size) = matrix_dimensions(r.len(), 1);
@@ -482,7 +473,7 @@ mod tests {
         let s = 10;
         let mut r: Vec<F> = Vec::new();
         for _i in 0..s {
-            r.push(F::rand(&mut prng));
+            r.push(F::random(&mut prng));
         }
         let (L_size, _R_size) = matrix_dimensions(r.len(), 1);
         let (L, R) = compute_factored_chis_at_r(&r);

@@ -8,15 +8,15 @@
 #![feature(iter_next_chunk)]
 #![allow(long_running_const_eval)]
 
-pub mod benches;
-pub mod host;
-pub mod jolt;
-pub mod lasso;
-pub mod msm;
+// pub mod benches;
+// pub mod host;
+// pub mod jolt;
+// pub mod lasso;
+// pub mod msm;
 pub mod poly;
-pub mod r1cs;
-mod subprotocols;
+// pub mod r1cs;
+// mod subprotocols;
 mod utils;
 
 // Benchmarks
-pub use crate::subprotocols::sumcheck::bench::sumcheck_bench;
+// pub use crate::subprotocols::sumcheck::bench::sumcheck_bench;

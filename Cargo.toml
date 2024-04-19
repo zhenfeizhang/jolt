@@ -11,6 +11,8 @@ authors = [
     "Sam Ragsdale <sragsdale@a16z.com>",
     "Noah Citron <ncitron@a16z.com>",
     "Arasu Arun <arasu.arun5@gmail.com>",
+    # authors who contributed to the Jolty2
+    "Zhenfei Zhang <zhenfei.zhang@hotmail.com>",
 ]
 edition = "2021"
 description = "The lookup singularity. Based on Spartan; built on Arkworks."
@@ -79,7 +81,3 @@ lto = "off"
 inherits = "release"
 debug = false
 
-[patch.crates-io]
-ark-ff = { git = "https://github.com/a16z/arkworks-algebra", branch = "optimize/field-from-u64" }
-ark-ec = { git = "https://github.com/a16z/arkworks-algebra", branch = "optimize/field-from-u64" }
-ark-serialize = { git = "https://github.com/a16z/arkworks-algebra", branch = "optimize/field-from-u64" }

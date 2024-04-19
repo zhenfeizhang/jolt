@@ -1,5 +1,4 @@
-use ark_ec::CurveGroup;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
 use ark_std::rand::SeedableRng;
 use digest::{ExtendableOutput, Input};
 use rand_chacha::ChaCha20Rng;

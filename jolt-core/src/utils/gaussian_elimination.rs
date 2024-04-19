@@ -4,7 +4,7 @@
 // Wikipedia reference: augmented matrix: https://en.wikipedia.org/wiki/Augmented_matrix
 // Wikipedia reference: algorithm: https://en.wikipedia.org/wiki/Gaussian_elimination
 
-use ark_ff::PrimeField;
+use ff::PrimeField;
 
 pub fn gaussian_elimination<F: PrimeField>(matrix: &mut [Vec<F>]) -> Vec<F> {
     let size = matrix.len();
@@ -24,23 +24,23 @@ pub fn gaussian_elimination<F: PrimeField>(matrix: &mut [Vec<F>]) -> Vec<F> {
     // Checking the diagonal like this is simpler than any alternative.
     #[allow(clippy::needless_range_loop)]
     for i in 0..size {
-        if matrix[i][i] == F::zero() {
+        if matrix[i][i] == F::ZERO {
             println!("Infinitely many solutions");
         }
     }
 
-    let mut result: Vec<F> = vec![F::zero(); size];
+    let mut result: Vec<F> = vec![F::ZERO; size];
     for i in 0..size {
-        result[i] = matrix[i][size] / matrix[i][i];
+        result[i] = matrix[i][size] * matrix[i][i].invert().unwrap();
     }
     result
 }
 
 fn echelon<F: PrimeField>(matrix: &mut [Vec<F>], i: usize, j: usize) {
     let size = matrix.len();
-    if matrix[i][i] == F::zero() {
+    if matrix[i][i] == F::ZERO {
     } else {
-        let factor = matrix[j + 1][i] / matrix[i][i];
+        let factor = matrix[j + 1][i] * matrix[i][i].invert().unwrap();
         (i..size + 1).for_each(|k| {
             let tmp = matrix[i][k];
             matrix[j + 1][k] -= factor * tmp;
@@ -50,10 +50,10 @@ fn echelon<F: PrimeField>(matrix: &mut [Vec<F>], i: usize, j: usize) {
 
 fn eliminate<F: PrimeField>(matrix: &mut [Vec<F>], i: usize) {
     let size = matrix.len();
-    if matrix[i][i] == F::zero() {
+    if matrix[i][i] == F::ZERO {
     } else {
         for j in (1..i + 1).rev() {
-            let factor = matrix[j - 1][i] / matrix[i][i];
+            let factor = matrix[j - 1][i] * matrix[i][i].invert().unwrap();
             for k in (0..size + 1).rev() {
                 let tmp = matrix[i][k];
                 matrix[j - 1][k] -= factor * tmp;
@@ -64,13 +64,20 @@ fn eliminate<F: PrimeField>(matrix: &mut [Vec<F>], i: usize) {
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::Fr;
-
     use super::gaussian_elimination;
-    use ark_std::{One, Zero};
+    use ff::PrimeField;
+    use goldilocks::Goldilocks;
+    use goldilocks::GoldilocksExt2;
+    use halo2curves::bn256::Fr;
 
     #[test]
     fn test_gauss() {
+        test_gauss_helper::<Fr>();
+        test_gauss_helper::<Goldilocks>();
+        test_gauss_helper::<GoldilocksExt2>();
+    }
+
+    fn test_gauss_helper<F: PrimeField>() {
         let mut matrix: Vec<Vec<Fr>> = vec![
             vec![Fr::one(), Fr::zero(), Fr::zero(), Fr::from(2u64)],
             vec![Fr::one(), Fr::one(), Fr::one(), Fr::from(17u64)],

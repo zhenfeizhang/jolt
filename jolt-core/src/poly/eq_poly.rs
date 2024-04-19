@@ -1,4 +1,4 @@
-use ark_ff::PrimeField;
+use ff::PrimeField;
 use rayon::prelude::*;
 
 use crate::utils::{math::Math, thread::unsafe_allocate_zero_vec};
@@ -17,7 +17,7 @@ impl<F: PrimeField> EqPolynomial<F> {
     pub fn evaluate(&self, rx: &[F]) -> F {
         assert_eq!(self.r.len(), rx.len());
         (0..rx.len())
-            .map(|i| self.r[i] * rx[i] + (F::one() - self.r[i]) * (F::one() - rx[i]))
+            .map(|i| self.r[i] * rx[i] + (F::ONE - self.r[i]) * (F::ONE - rx[i]))
             .product()
     }
 
@@ -33,7 +33,7 @@ impl<F: PrimeField> EqPolynomial<F> {
 
     /// Computes evals serially. Uses less memory (and fewer allocations) than `evals_parallel`.
     fn evals_serial(&self, ell: usize) -> Vec<F> {
-        let mut evals: Vec<F> = vec![F::one(); ell.pow2()];
+        let mut evals: Vec<F> = vec![F::ONE; ell.pow2()];
         let mut size = 1;
         for j in 0..ell {
             // in each iteration, we double the size of chis
@@ -55,7 +55,7 @@ impl<F: PrimeField> EqPolynomial<F> {
         let final_size = (2usize).pow(ell as u32);
         let mut evals: Vec<F> = unsafe_allocate_zero_vec(final_size);
         let mut size = 1;
-        evals[0] = F::one();
+        evals[0] = F::ONE;
 
         for r in self.r.iter().rev() {
             let (evals_left, evals_right) = evals.split_at_mut(size);
