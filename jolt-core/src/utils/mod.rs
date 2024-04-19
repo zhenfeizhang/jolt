@@ -6,7 +6,7 @@ use ark_std::test_rng;
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
 
-// use crate::poly::dense_mlpoly::DensePolynomial;
+use crate::poly::dense_mlpoly::DensePolynomial;
 
 pub mod errors;
 pub mod gaussian_elimination;
@@ -125,45 +125,45 @@ pub fn gen_random_point<F: PrimeField>(memory_bits: usize) -> Vec<F> {
     r_i
 }
 
-// #[inline]
-// #[tracing::instrument(skip_all, name = "split_poly_flagged")]
-// pub fn split_poly_flagged<F: PrimeField>(
-//     poly: &DensePolynomial<F>,
-//     flags: &DensePolynomial<F>,
-// ) -> (Vec<F>, Vec<F>) {
-//     let poly_evals: &[F] = poly.evals_ref();
-//     let len = poly_evals.len();
-//     let half = len / 2;
-//     let mut left: Vec<F> = Vec::with_capacity(half);
-//     let mut right: Vec<F> = Vec::with_capacity(half);
+#[inline]
+#[tracing::instrument(skip_all, name = "split_poly_flagged")]
+pub fn split_poly_flagged<F: PrimeField>(
+    poly: &DensePolynomial<F>,
+    flags: &DensePolynomial<F>,
+) -> (Vec<F>, Vec<F>) {
+    let poly_evals: &[F] = poly.evals_ref();
+    let len = poly_evals.len();
+    let half = len / 2;
+    let mut left: Vec<F> = Vec::with_capacity(half);
+    let mut right: Vec<F> = Vec::with_capacity(half);
 
-//     for i in 0..len {
-//         if flags[i].is_zero() {
-//             if i < half {
-//                 left.push(F::one());
-//             } else {
-//                 right.push(F::one());
-//             }
-//         } else {
-//             if i < half {
-//                 left.push(poly_evals[i]);
-//             } else {
-//                 right.push(poly_evals[i]);
-//             }
-//         }
-//     }
-//     (left, right)
-// }
+    for i in 0..len {
+        if flags[i].is_zero_vartime() {
+            if i < half {
+                left.push(F::ONE);
+            } else {
+                right.push(F::ONE);
+            }
+        } else {
+            if i < half {
+                left.push(poly_evals[i]);
+            } else {
+                right.push(poly_evals[i]);
+            }
+        }
+    }
+    (left, right)
+}
 
-// pub fn count_poly_zeros<F: PrimeField>(poly: &DensePolynomial<F>) -> usize {
-//     let mut count = 0;
-//     for i in 0..poly.len() {
-//         if poly[i].is_zero() {
-//             count += 1;
-//         }
-//     }
-//     count
-// }
+pub fn count_poly_zeros<F: PrimeField>(poly: &DensePolynomial<F>) -> usize {
+    let mut count = 0;
+    for i in 0..poly.len() {
+        if poly[i].is_zero_vartime() {
+            count += 1;
+        }
+    }
+    count
+}
 
 #[cfg(test)]
 mod tests {
