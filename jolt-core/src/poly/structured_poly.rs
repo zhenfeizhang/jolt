@@ -1,6 +1,5 @@
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+use halo2curves::CurveAffine;
 
 use super::pedersen::PedersenGenerators;
 use crate::{
@@ -11,7 +10,7 @@ use crate::{
 /// Encapsulates the pattern of a collection of related polynomials (e.g. those used to
 /// prove instruction lookups in Jolt) that can be "batched" for more efficient
 /// commitments/openings.
-pub trait StructuredCommitment<G: CurveGroup>: Send + Sync + Sized {
+pub trait StructuredCommitment<G: CurveAffine>: Send + Sync + Sized {
     /// The batched commitment to these polynomials.
     type Commitment;
 

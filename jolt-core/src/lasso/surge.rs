@@ -1,11 +1,11 @@
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ff::PrimeField;
+use halo2curves::{group::Curve, CurveAffine};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use std::marker::{PhantomData, Sync};
 
 use crate::{
-    jolt::instruction::JoltInstruction,
+    // jolt::instruction::JoltInstruction,
     lasso::memory_checking::{MemoryCheckingProof, MemoryCheckingProver, MemoryCheckingVerifier},
     poly::{
         dense_mlpoly::DensePolynomial,
@@ -13,16 +13,16 @@ use crate::{
         hyrax::{matrix_dimensions, BatchedHyraxOpeningProof, HyraxCommitment},
         identity_poly::IdentityPolynomial,
         pedersen::PedersenGenerators,
-        structured_poly::{StructuredCommitment, StructuredOpeningProof},
+        // structured_poly::{StructuredCommitment, StructuredOpeningProof},
     },
-    subprotocols::sumcheck::SumcheckInstanceProof,
+    // subprotocols::sumcheck::SumcheckInstanceProof,
     utils::{errors::ProofVerifyError, math::Math, mul_0_1_optimized, transcript::ProofTranscript},
 };
 
 pub struct SurgePolys<F, G>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
 {
     _group: PhantomData<G>,
     pub dim: Vec<DensePolynomial<F>>,
@@ -35,8 +35,8 @@ where
 const SURGE_HYRAX_RATIO_READ_WRITE: usize = 16;
 const SURGE_HYRAX_RATIO_FINAL: usize = 4;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
-pub struct SurgeCommitment<G: CurveGroup> {
+#[derive(Serialize, Deserialize)]
+pub struct SurgeCommitment<G: CurveAffine> {
     /// Commitments to dim_i and read_cts_i polynomials.
     pub dim_read_commitment: Vec<HyraxCommitment<SURGE_HYRAX_RATIO_READ_WRITE, G>>,
     /// Commitment to final_cts_i polynomials.
@@ -48,7 +48,7 @@ pub struct SurgeCommitment<G: CurveGroup> {
 impl<F, G> StructuredCommitment<G> for SurgePolys<F, G>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
 {
     type Commitment = SurgeCommitment<G>;
 
@@ -78,7 +78,7 @@ type PrimarySumcheckOpenings<F> = Vec<F>;
 impl<F, G> StructuredOpeningProof<F, G, SurgePolys<F, G>> for PrimarySumcheckOpenings<F>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
 {
     type Proof = BatchedHyraxOpeningProof<16, G>;
 
@@ -125,7 +125,7 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SurgeReadWriteOpenings<F>
 where
     F: PrimeField,
@@ -138,7 +138,7 @@ where
 impl<F, G> StructuredOpeningProof<F, G, SurgePolys<F, G>> for SurgeReadWriteOpenings<F>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
 {
     type Proof = BatchedHyraxOpeningProof<16, G>;
 
@@ -209,7 +209,7 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SurgeFinalOpenings<F, Instruction, const C: usize, const M: usize>
 where
     F: PrimeField,
@@ -296,7 +296,7 @@ impl<F, G, Instruction, const C: usize, const M: usize> MemoryCheckingProver<F, 
     for SurgeProof<F, G, Instruction, C, M>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
     Instruction: JoltInstruction + Default + Sync,
 {
     type Preprocessing = SurgePreprocessing<F, Instruction, C, M>;
@@ -389,7 +389,7 @@ impl<F, G, Instruction, const C: usize, const M: usize>
     MemoryCheckingVerifier<F, G, SurgePolys<F, G>> for SurgeProof<F, G, Instruction, C, M>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
     Instruction: JoltInstruction + Default + Sync,
 {
     fn read_tuples(
@@ -462,7 +462,7 @@ where
 pub struct SurgePrimarySumcheck<F, G>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
 {
     sumcheck_proof: SumcheckInstanceProof<F>,
     num_rounds: usize,
@@ -483,7 +483,7 @@ where
 pub struct SurgeProof<F, G, Instruction, const C: usize, const M: usize>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
     Instruction: JoltInstruction + Default,
 {
     /// Commitments to all polynomials
@@ -525,7 +525,7 @@ where
 impl<F, G, Instruction, const C: usize, const M: usize> SurgeProof<F, G, Instruction, C, M>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: CurveAffine<ScalarField = F>,
     Instruction: JoltInstruction + Default + Sync,
 {
     fn num_memories() -> usize {

@@ -5,9 +5,10 @@ use crate::subprotocols::sumcheck::CubicSumcheckType;
 use crate::utils::math::Math;
 use crate::utils::mul_0_1_optimized;
 use crate::utils::transcript::ProofTranscript;
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::*;
+
+use ff::{FromUniformBytes, PrimeField};
+use halo2curves::group::Curve;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct GrandProductCircuit<F> {
@@ -94,17 +95,17 @@ impl<F: PrimeField> GrandProductCircuit<F> {
     pub fn take_layer(&mut self, layer_id: usize) -> (DensePolynomial<F>, DensePolynomial<F>) {
         let left = std::mem::replace(
             &mut self.left_vec[layer_id],
-            DensePolynomial::new(vec![F::zero()]),
+            DensePolynomial::new(vec![F::ZERO]),
         );
         let right = std::mem::replace(
             &mut self.right_vec[layer_id],
-            DensePolynomial::new(vec![F::zero()]),
+            DensePolynomial::new(vec![F::ZERO]),
         );
         (left, right)
     }
 }
 
-#[derive(Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LayerProofBatched<F: PrimeField> {
     pub proof: SumcheckInstanceProof<F>,
     pub claims_poly_A: Vec<F>,
@@ -113,7 +114,7 @@ pub struct LayerProofBatched<F: PrimeField> {
 }
 
 #[allow(dead_code)]
-impl<F: PrimeField> LayerProofBatched<F> {
+impl<F: FromUniformBytes<64>> LayerProofBatched<F> {
     pub fn verify<G>(
         &self,
         claim: F,
@@ -122,7 +123,7 @@ impl<F: PrimeField> LayerProofBatched<F> {
         transcript: &mut ProofTranscript,
     ) -> (F, Vec<F>)
     where
-        G: CurveGroup<ScalarField = F>,
+        G: Curve<Scalar = F>,
     {
         self.proof
             .verify::<G>(claim, num_rounds, degree_bound, transcript)
@@ -213,19 +214,19 @@ impl<F: PrimeField> BatchedGrandProductCircuit<F> {
     }
 }
 
-#[derive(Debug, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BatchedGrandProductArgument<F: PrimeField> {
     proof: Vec<LayerProofBatched<F>>,
 }
 
-impl<F: PrimeField> BatchedGrandProductArgument<F> {
+impl<F: FromUniformBytes<64>> BatchedGrandProductArgument<F> {
     #[tracing::instrument(skip_all, name = "BatchedGrandProductArgument.prove")]
     pub fn prove<G>(
         mut batch: BatchedGrandProductCircuit<F>,
         transcript: &mut ProofTranscript,
     ) -> (Self, Vec<F>)
     where
-        G: CurveGroup<ScalarField = F>,
+        G: Curve<Scalar = F>,
     {
         let mut proof_layers: Vec<LayerProofBatched<F>> = Vec::new();
         let mut claims_to_verify = (0..batch.circuits.len())
@@ -312,7 +313,7 @@ impl<F: PrimeField> BatchedGrandProductArgument<F> {
         transcript: &mut ProofTranscript,
     ) -> (Vec<F>, Vec<F>)
     where
-        G: CurveGroup<ScalarField = F>,
+        G: Curve<Scalar = F>,
     {
         let mut rand: Vec<F> = Vec::new();
         let num_layers = self.proof.len();
@@ -343,7 +344,7 @@ impl<F: PrimeField> BatchedGrandProductArgument<F> {
 
             assert_eq!(rand.len(), rand_prod.len());
             let eq: F = (0..rand.len())
-                .map(|i| rand[i] * rand_prod[i] + (F::one() - rand[i]) * (F::one() - rand_prod[i]))
+                .map(|i| rand[i] * rand_prod[i] + (F::ONE - rand[i]) * (F::ONE - rand_prod[i]))
                 .product();
 
             // Compute the claim_expected which is a random linear combination of the batched evaluations.
@@ -392,8 +393,7 @@ impl<F: PrimeField> BatchedGrandProductArgument<F> {
 
                 claims_to_verify = (0..claims_prod_left.len())
                     .map(|i| {
-                        claims_prod_left[i] * claims_prod_right[i]
-                            + (F::one() - claims_prod_right[i])
+                        claims_prod_left[i] * claims_prod_right[i] + (F::ONE - claims_prod_right[i])
                     })
                     .collect::<Vec<F>>();
 
@@ -409,31 +409,52 @@ impl<F: PrimeField> BatchedGrandProductArgument<F> {
 #[cfg(test)]
 mod grand_product_circuit_tests {
     use super::*;
-    use ark_bn254::{Fr, G1Projective};
-    use ark_std::{One, Zero};
+
+    use ff::Field;
+    use halo2curves::{bn256, grumpkin};
 
     #[test]
     fn prove_verify() {
-        let factorial =
-            DensePolynomial::new(vec![Fr::from(1), Fr::from(2), Fr::from(3), Fr::from(4)]);
+        prove_verify_helper::<bn256::G1>();
+        prove_verify_helper::<grumpkin::G1>();
+    }
+
+    fn prove_verify_helper<G: Curve>()
+    where
+        G::Scalar: FromUniformBytes<64>,
+    {
+        let factorial = DensePolynomial::new(vec![
+            G::Scalar::from(1),
+            G::Scalar::from(2),
+            G::Scalar::from(3),
+            G::Scalar::from(4),
+        ]);
         let factorial_circuit = GrandProductCircuit::new(&factorial);
-        let expected_eval = vec![Fr::from(24)];
-        assert_eq!(factorial_circuit.evaluate(), Fr::from(24));
+        let expected_eval = vec![G::Scalar::from(24)];
+        assert_eq!(factorial_circuit.evaluate(), G::Scalar::from(24));
 
         let mut transcript = ProofTranscript::new(b"test_transcript");
         let circuits_vec = vec![factorial_circuit];
         let batch = BatchedGrandProductCircuit::new_batch(circuits_vec);
-        let (proof, _) = BatchedGrandProductArgument::prove::<G1Projective>(batch, &mut transcript);
+        let (proof, _) = BatchedGrandProductArgument::prove::<G>(batch, &mut transcript);
 
         let mut transcript = ProofTranscript::new(b"test_transcript");
-        proof.verify::<G1Projective>(&expected_eval, &mut transcript);
+        proof.verify::<G>(&expected_eval, &mut transcript);
     }
 
     #[test]
     fn gp_unflagged() {
+        gp_unflagged_helper::<bn256::G1>();
+        gp_unflagged_helper::<grumpkin::G1>();
+    }
+
+    fn gp_unflagged_helper<G: Curve>()
+    where
+        G::Scalar: FromUniformBytes<64>,
+    {
         // Fundamentally grand products performs a multi-set check, so skip fingerprinting and all that, construct GP circuits directly
-        let read_leaves = vec![Fr::from(10), Fr::from(20)];
-        let write_leaves = vec![Fr::from(100), Fr::from(200)];
+        let read_leaves = vec![G::Scalar::from(10), G::Scalar::from(20)];
+        let write_leaves = vec![G::Scalar::from(100), G::Scalar::from(200)];
 
         let read_poly = DensePolynomial::new(read_leaves);
         let write_poly = DensePolynomial::new(write_leaves);
@@ -446,12 +467,12 @@ mod grand_product_circuit_tests {
 
         let mut transcript = ProofTranscript::new(b"test_transcript");
         let (proof, prove_rand) =
-            BatchedGrandProductArgument::<Fr>::prove::<G1Projective>(batch, &mut transcript);
+            BatchedGrandProductArgument::<G::Scalar>::prove::<G>(batch, &mut transcript);
 
-        let expected_eval_read = Fr::from(10) * Fr::from(20);
-        let expected_eval_write = Fr::from(100) * Fr::from(200);
+        let expected_eval_read = G::Scalar::from(10) * G::Scalar::from(20);
+        let expected_eval_write = G::Scalar::from(100) * G::Scalar::from(200);
         let mut transcript = ProofTranscript::new(b"test_transcript");
-        let (verify_claims, verify_rand) = proof.verify::<G1Projective>(
+        let (verify_claims, verify_rand) = proof.verify::<G>(
             &vec![expected_eval_read, expected_eval_write],
             &mut transcript,
         );
@@ -464,17 +485,40 @@ mod grand_product_circuit_tests {
 
     #[test]
     fn gp_flagged() {
-        let read_fingerprints = vec![Fr::from(10), Fr::from(20), Fr::from(30), Fr::from(40)];
-        let write_fingerprints = vec![Fr::from(100), Fr::from(200), Fr::from(300), Fr::from(400)];
+        gp_flagged_helper::<bn256::G1>();
+        gp_flagged_helper::<grumpkin::G1>();
+    }
+
+    fn gp_flagged_helper<G: Curve>()
+    where
+        G::Scalar: FromUniformBytes<64>,
+    {
+        let read_fingerprints = vec![
+            G::Scalar::from(10),
+            G::Scalar::from(20),
+            G::Scalar::from(30),
+            G::Scalar::from(40),
+        ];
+        let write_fingerprints = vec![
+            G::Scalar::from(100),
+            G::Scalar::from(200),
+            G::Scalar::from(300),
+            G::Scalar::from(400),
+        ];
 
         // toggle off index '2'
-        let flag_poly = DensePolynomial::new(vec![Fr::one(), Fr::one(), Fr::zero(), Fr::one()]);
+        let flag_poly = DensePolynomial::new(vec![
+            G::Scalar::ONE,
+            G::Scalar::ONE,
+            G::Scalar::ZERO,
+            G::Scalar::ONE,
+        ]);
 
         // Grand Product Circuit leaves are those that are toggled
         let mut read_leaves = read_fingerprints.clone();
-        read_leaves[2] = Fr::one();
+        read_leaves[2] = G::Scalar::ONE;
         let mut write_leaves = write_fingerprints.clone();
-        write_leaves[2] = Fr::one();
+        write_leaves[2] = G::Scalar::ONE;
 
         let read_leaf_poly = DensePolynomial::new(read_leaves);
         let write_leaf_poly = DensePolynomial::new(write_leaves);
@@ -499,15 +543,15 @@ mod grand_product_circuit_tests {
 
         let mut transcript = ProofTranscript::new(b"test_transcript");
         let (proof, prove_rand) =
-            BatchedGrandProductArgument::<Fr>::prove::<G1Projective>(batch, &mut transcript);
+            BatchedGrandProductArgument::<G::Scalar>::prove::<G>(batch, &mut transcript);
 
-        let expected_eval_read: Fr = Fr::from(10) * Fr::from(20) * Fr::from(40);
-        let expected_eval_write: Fr = Fr::from(100) * Fr::from(200) * Fr::from(400);
+        let expected_eval_read = G::Scalar::from(10) * G::Scalar::from(20) * G::Scalar::from(40);
+        let expected_eval_write =
+            G::Scalar::from(100) * G::Scalar::from(200) * G::Scalar::from(400);
         let expected_evals = vec![expected_eval_read, expected_eval_write];
 
         let mut transcript = ProofTranscript::new(b"test_transcript");
-        let (verify_claims, verify_rand) =
-            proof.verify::<G1Projective>(&expected_evals, &mut transcript);
+        let (verify_claims, verify_rand) = proof.verify::<G>(&expected_evals, &mut transcript);
 
         assert_eq!(prove_rand, verify_rand);
         assert_eq!(verify_claims.len(), 2);
@@ -535,10 +579,10 @@ mod grand_product_circuit_tests {
 
         let verifier_flag_eval = flag_poly.evaluate(&verify_rand);
         let verifier_read_eval = verifier_flag_eval * fingerprint_polys[0].evaluate(&verify_rand)
-            + Fr::one()
+            + G::Scalar::ONE
             - verifier_flag_eval;
         let verifier_write_eval = verifier_flag_eval * fingerprint_polys[1].evaluate(&verify_rand)
-            + Fr::one()
+            + G::Scalar::ONE
             - verifier_flag_eval;
         assert_eq!(verify_claims[0], verifier_read_eval);
         assert_eq!(verify_claims[1], verifier_write_eval);
