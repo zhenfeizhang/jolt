@@ -12,7 +12,7 @@
 // pub mod host;
 // pub mod jolt;
 // pub mod lasso;
-// pub mod msm;
+pub mod msm;
 pub mod poly;
 // pub mod r1cs;
 // mod subprotocols;
