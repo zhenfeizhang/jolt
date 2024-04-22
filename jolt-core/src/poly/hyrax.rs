@@ -30,16 +30,16 @@ pub fn matrix_dimensions(num_vars: usize, matrix_aspect_ratio: usize) -> (usize,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct HyraxGenerators<const RATIO: usize, G: CurveAffine> {
+pub struct HyraxGenerators<const RATIO: usize, G: Curve> {
     pub gens: PedersenGenerators<G>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HyraxCommitment<const RATIO: usize, G: CurveAffine> {
+pub struct HyraxCommitment<const RATIO: usize, G: Curve> {
     row_commitments: Vec<G>,
 }
 
-impl<const RATIO: usize, G: CurveAffine> HyraxCommitment<RATIO, G> {
+impl<const RATIO: usize, G: Curve> HyraxCommitment<RATIO, G> {
     #[tracing::instrument(skip_all, name = "HyraxCommitment::commit")]
     pub fn commit(poly: &DensePolynomial<G::Scalar>, generators: &PedersenGenerators<G>) -> Self {
         let n = poly.len();
@@ -124,7 +124,7 @@ impl<const RATIO: usize, G: CurveAffine> HyraxCommitment<RATIO, G> {
     }
 }
 
-impl<const RATIO: usize, G: CurveAffine> AppendToTranscript for HyraxCommitment<RATIO, G> {
+impl<const RATIO: usize, G: Curve> AppendToTranscript for HyraxCommitment<RATIO, G> {
     fn append_to_transcript(&self, label: &'static [u8], transcript: &mut ProofTranscript) {
         transcript.append_message(label, b"poly_commitment_begin");
         for i in 0..self.row_commitments.len() {
@@ -135,12 +135,12 @@ impl<const RATIO: usize, G: CurveAffine> AppendToTranscript for HyraxCommitment<
 }
 
 #[derive(Debug)]
-pub struct HyraxOpeningProof<const RATIO: usize, G: CurveAffine> {
+pub struct HyraxOpeningProof<const RATIO: usize, G: Curve> {
     vector_matrix_product: Vec<G::Scalar>,
 }
 
 /// See Section 14.3 of Thaler's Proofs, Arguments, and Zero-Knowledge
-impl<const RATIO: usize, G: CurveAffine> HyraxOpeningProof<RATIO, G> {
+impl<const RATIO: usize, G: Curve> HyraxOpeningProof<RATIO, G> {
     fn protocol_name() -> &'static [u8] {
         b"Hyrax opening proof"
     }
@@ -225,12 +225,12 @@ impl<const RATIO: usize, G: CurveAffine> HyraxOpeningProof<RATIO, G> {
 }
 
 #[derive(Debug)]
-pub struct BatchedHyraxOpeningProof<const RATIO: usize, G: CurveAffine> {
+pub struct BatchedHyraxOpeningProof<const RATIO: usize, G: Curve> {
     joint_proof: HyraxOpeningProof<RATIO, G>,
 }
 
 /// See Section 16.1 of Thaler's Proofs, Arguments, and Zero-Knowledge
-impl<const RATIO: usize, G: CurveAffine> BatchedHyraxOpeningProof<RATIO, G>
+impl<const RATIO: usize, G: Curve> BatchedHyraxOpeningProof<RATIO, G>
 where
     G::Scalar: FromUniformBytes<64>,
 {

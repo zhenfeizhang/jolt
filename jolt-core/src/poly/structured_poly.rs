@@ -1,5 +1,6 @@
-
-use halo2curves::CurveAffine;
+use ff::PrimeField;
+use halo2curves::{group::Curve, CurveAffine};
+use serde::{Deserialize, Serialize};
 
 use super::pedersen::PedersenGenerators;
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
 /// Encapsulates the pattern of a collection of related polynomials (e.g. those used to
 /// prove instruction lookups in Jolt) that can be "batched" for more efficient
 /// commitments/openings.
-pub trait StructuredCommitment<G: CurveAffine>: Send + Sync + Sized {
+pub trait StructuredCommitment<G: Curve>: Send + Sync + Sized {
     /// The batched commitment to these polynomials.
     type Commitment;
 
@@ -22,15 +23,16 @@ pub trait StructuredCommitment<G: CurveAffine>: Send + Sync + Sized {
 /// Note that there may be a one-to-many mapping from `StructuredCommitment` to `StructuredOpeningProof`:
 /// different subset of the same polynomials may be opened at different points, resulting in
 /// different opening proofs.
-pub trait StructuredOpeningProof<F, G, Polynomials>:
-    Sync + CanonicalSerialize + CanonicalDeserialize
+// pub trait StructuredOpeningProof<'a, F, G, Polynomials>:
+//     Sync + Serialize + Deserialize<'a>
+pub trait StructuredOpeningProof<F, G, Polynomials>: Sync
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: Curve<Scalar = F>,
     Polynomials: StructuredCommitment<G> + ?Sized,
 {
     type Preprocessing = NoPreprocessing;
-    type Proof: Sync + CanonicalSerialize + CanonicalDeserialize;
+    type Proof: Sync ;
 
     /// Evaluates each of the given `polynomials` at the given `opening_point`.
     fn open(polynomials: &Polynomials, opening_point: &Vec<F>) -> Self;

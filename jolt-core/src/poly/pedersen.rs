@@ -10,11 +10,11 @@ use std::io::Read;
 use crate::msm::best_multiexp;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PedersenGenerators<G: CurveAffine> {
+pub struct PedersenGenerators<G: Curve> {
     pub generators: Vec<G>,
 }
 
-impl<G: CurveAffine> PedersenGenerators<G> {
+impl<G: Curve> PedersenGenerators<G> {
     #[tracing::instrument(skip_all, name = "PedersenGenerators::new")]
     pub fn new(len: usize, label: &[u8]) -> Self {
         let mut shake = Shake256::default();
@@ -50,19 +50,19 @@ impl<G: CurveAffine> PedersenGenerators<G> {
     }
 }
 
-pub trait PedersenCommitment<G: CurveAffine>: Sized {
-    fn commit(&self, gens: &PedersenGenerators<G>) -> G::Curve;
-    fn commit_vector(inputs: &[Self], bases: &[G]) -> G::Curve;
+pub trait PedersenCommitment<G: Curve>: Sized {
+    fn commit(&self, gens: &PedersenGenerators<G>) -> G;
+    fn commit_vector(inputs: &[Self], bases: &[G]) -> G;
 }
 
-impl<G: CurveAffine> PedersenCommitment<G> for G::Scalar {
+impl<G: Curve> PedersenCommitment<G> for G::Scalar {
     #[tracing::instrument(skip_all, name = "PedersenCommitment::commit")]
-    fn commit(&self, gens: &PedersenGenerators<G>) -> G::Curve {
+    fn commit(&self, gens: &PedersenGenerators<G>) -> G {
         assert_eq!(gens.generators.len(), 1);
         gens.generators[0].mul(self)
     }
 
-    fn commit_vector(inputs: &[Self], bases: &[G]) -> G::Curve {
+    fn commit_vector(inputs: &[Self], bases: &[G]) -> G {
         assert_eq!(bases.len(), inputs.len());
         best_multiexp(&inputs, &bases)
     }

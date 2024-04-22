@@ -12,15 +12,15 @@ use crate::subprotocols::grand_product::{
 use crate::utils::errors::ProofVerifyError;
 use crate::utils::transcript::ProofTranscript;
 
-// use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ff::PrimeField;
+use halo2curves::{group::Curve, CurveAffine};
 use itertools::interleave;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use std::iter::zip;
 use std::marker::PhantomData;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MultisetHashes<F: PrimeField> {
     /// Multiset hash of "read" tuples
     pub read_hashes: Vec<F>,
@@ -33,7 +33,7 @@ pub struct MultisetHashes<F: PrimeField> {
 }
 
 impl<F: PrimeField> MultisetHashes<F> {
-    pub fn append_to_transcript<G: CurveGroup<ScalarField = F>>(
+    pub fn append_to_transcript<G: Curve<Scalar = F>>(
         &self,
         transcript: &mut ProofTranscript,
     ) {
@@ -44,23 +44,23 @@ impl<F: PrimeField> MultisetHashes<F> {
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MemoryCheckingProof<G, Polynomials, ReadWriteOpenings, InitFinalOpenings>
 where
-    G: CurveGroup,
+    G: Curve,
     Polynomials: StructuredCommitment<G>,
-    ReadWriteOpenings: StructuredOpeningProof<G::ScalarField, G, Polynomials>,
-    InitFinalOpenings: StructuredOpeningProof<G::ScalarField, G, Polynomials>,
+    ReadWriteOpenings: StructuredOpeningProof<G::Scalar, G, Polynomials>,
+    InitFinalOpenings: StructuredOpeningProof<G::Scalar, G, Polynomials>,
 {
     pub _polys: PhantomData<Polynomials>,
     /// Read/write/init/final multiset hashes for each memory
-    pub multiset_hashes: MultisetHashes<G::ScalarField>,
+    pub multiset_hashes: MultisetHashes<G::Scalar>,
     /// The read and write grand products for every memory has the same size,
     /// so they can be batched.
-    pub read_write_grand_product: BatchedGrandProductArgument<G::ScalarField>,
+    pub read_write_grand_product: BatchedGrandProductArgument<G::Scalar>,
     /// The init and final grand products for every memory has the same size,
     /// so they can be batched.
-    pub init_final_grand_product: BatchedGrandProductArgument<G::ScalarField>,
+    pub init_final_grand_product: BatchedGrandProductArgument<G::Scalar>,
     /// The opening proofs associated with the read/write grand product.
     pub read_write_openings: ReadWriteOpenings,
     pub read_write_opening_proof: ReadWriteOpenings::Proof,
@@ -75,7 +75,7 @@ pub struct NoPreprocessing;
 pub trait MemoryCheckingProver<F, G, Polynomials>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: Curve<Scalar = F>,
     Polynomials: StructuredCommitment<G> + std::marker::Sync,
     Self: std::marker::Sync,
 {
@@ -323,7 +323,7 @@ pub trait MemoryCheckingVerifier<F, G, Polynomials>:
     MemoryCheckingProver<F, G, Polynomials>
 where
     F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
+    G: Curve<Scalar = F>,
     Polynomials: StructuredCommitment<G> + std::marker::Sync,
 {
     /// Verifies a memory checking proof, given its associated polynomial `commitment`.
